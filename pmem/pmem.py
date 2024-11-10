@@ -1,0 +1,118 @@
+import aiosqlite
+import hashlib
+import pickle
+import asyncio
+from typing import Any, Optional
+
+class PersistentMemory:
+    def __init__(self, database_file: str = 'persistent_memory.db'):
+        self.database_file = database_file
+        self.memory_store: dict = {}
+        self.write_queue: asyncio.Queue = asyncio.Queue()
+        self.initialized: bool = False
+        self._init_task: Optional[asyncio.Task] = None
+
+    async def initialize(self):
+        if self.initialized:
+            return
+
+        # データベースの初期化
+        async with aiosqlite.connect(self.database_file) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS memory (
+                    key TEXT PRIMARY KEY,
+                    value BLOB
+                )
+            ''')
+            await db.commit()
+
+        # データベースへの非同期書き込みタスク開始
+        self._init_task = asyncio.create_task(self._async_db_writer())
+        self.initialized = True
+
+    def _name_hash(self, name: str) -> str:
+        return hashlib.sha512(name.encode()).hexdigest()
+
+    async def save(self, key: str, val: Any):
+        if not self.initialized:
+            await self.initialize()
+        
+        hash_key = self._name_hash(key)
+        self.memory_store[hash_key] = val
+        await self.write_queue.put((hash_key, val))
+
+    async def _async_db_writer(self):
+        if not self.initialized:
+            await self.initialize()
+        
+        async with aiosqlite.connect(self.database_file) as db:
+            while True:
+                await asyncio.sleep(0.1)
+                hash_key, val = await self.write_queue.get()
+                try:
+                    await db.execute(
+                        'REPLACE INTO memory (key, value) VALUES (?, ?)',
+                        (hash_key, pickle.dumps(val))
+                    )
+                    await db.commit()
+                except Exception as e:
+                    print(f"Error writing to DB: {e}")
+                finally:
+                    self.write_queue.task_done()
+
+    async def load(self, key: str, defval: Any = None) -> Any:
+        if not self.initialized:
+            await self.initialize()
+        
+        hash_key = self._name_hash(key)
+        if hash_key in self.memory_store:
+            return self.memory_store[hash_key]
+
+        try:
+            async with aiosqlite.connect(self.database_file) as db:
+                async with db.execute(
+                    'SELECT value FROM memory WHERE key = ?',
+                    (hash_key,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    if row is not None:
+                        value = pickle.loads(row[0])
+                        self.memory_store[hash_key] = value
+                        return value
+        except Exception as e:
+            print(f"Error reading from DB: {e}")
+        
+        return defval
+
+    async def close(self):
+        """残りのキュー項目を処理し、リソースをクリーンアップします"""
+        if self._init_task:
+            await self.write_queue.join()
+            self._init_task.cancel()
+
+# 使用例
+async def main():
+    # インスタンス作成
+    mem = PersistentMemory('my_custom_database.db')
+    # メモリに保存
+    await mem.save("test_key", "test_value")
+    # メモリから読み込み
+    value = await mem.load("test_key")
+    print(f"Loaded value: {value}")
+    # クリーンアップ
+    await mem.close()
+
+    # インスタンス作成
+    mem = PersistentMemory('my_custom_database2.db')
+    # メモリに保存
+    await mem.save("test_key2", "test_value2")
+    # メモリから読み込み
+    value = await mem.load("test_key")
+    print(f"Loaded value: {value}")
+    value = await mem.load("test_key2")
+    print(f"Loaded value: {value}")
+    # クリーンアップ
+    await mem.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
