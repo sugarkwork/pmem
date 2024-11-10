@@ -3,9 +3,12 @@ import hashlib
 import pickle
 import asyncio
 from typing import Any, Optional
+import logging
+
 
 class PersistentMemory:
     def __init__(self, database_file: str = 'persistent_memory.db'):
+        self.logger = logging.getLogger('pmem')
         self.database_file = database_file
         self.memory_store: dict = {}
         self.write_queue: asyncio.Queue = asyncio.Queue()
@@ -29,6 +32,7 @@ class PersistentMemory:
         # データベースへの非同期書き込みタスク開始
         self._init_task = asyncio.create_task(self._async_db_writer())
         self.initialized = True
+        await asyncio.sleep(0.1)
 
     def _name_hash(self, name: str) -> str:
         return hashlib.sha512(name.encode()).hexdigest()
@@ -37,6 +41,8 @@ class PersistentMemory:
         if not self.initialized:
             await self.initialize()
         
+        self.logger.debug(f"Saving {key} to memory")
+
         hash_key = self._name_hash(key)
         self.memory_store[hash_key] = val
         await self.write_queue.put((hash_key, val))
@@ -50,13 +56,15 @@ class PersistentMemory:
                 await asyncio.sleep(0.1)
                 hash_key, val = await self.write_queue.get()
                 try:
+                    self.logger.debug(f"Writing {hash_key} to DB")
                     await db.execute(
                         'REPLACE INTO memory (key, value) VALUES (?, ?)',
                         (hash_key, pickle.dumps(val))
                     )
                     await db.commit()
+                    self.logger.debug(f"Write complete for {hash_key}")
                 except Exception as e:
-                    print(f"Error writing to DB: {e}")
+                    self.logger.error(f"Error writing to DB: {e}")
                 finally:
                     self.write_queue.task_done()
 
@@ -66,6 +74,7 @@ class PersistentMemory:
         
         hash_key = self._name_hash(key)
         if hash_key in self.memory_store:
+            self.logger.debug(f"Loaded {key} from memory")
             return self.memory_store[hash_key]
 
         try:
@@ -78,9 +87,10 @@ class PersistentMemory:
                     if row is not None:
                         value = pickle.loads(row[0])
                         self.memory_store[hash_key] = value
+                        self.logger.debug(f"Loaded {key} from DB")
                         return value
         except Exception as e:
-            print(f"Error reading from DB: {e}")
+            self.logger.error(f"Error reading from DB: {e}")
         
         return defval
 
