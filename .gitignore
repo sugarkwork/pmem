@@ -1,3 +1,4 @@
 /my_custom_database.db
 /my_custom_database2.db
 /venv
+pmem/__pycache__/
