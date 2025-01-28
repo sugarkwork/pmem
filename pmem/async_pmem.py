@@ -99,30 +99,47 @@ class PersistentMemory:
         if self._init_task:
             await self.write_queue.join()
             self._init_task.cancel()
+    
+    async def __aenter__(self):
+        await self.initialize()
+        return self
+    
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
 
 # 使用例
 async def main():
-    # インスタンス作成
-    mem = PersistentMemory('my_custom_database.db')
-    # メモリに保存
-    await mem.save("test_key", "test_value")
-    # メモリから読み込み
-    value = await mem.load("test_key")
-    print(f"Loaded value: {value}")
-    # クリーンアップ
-    await mem.close()
+
+    logging.basicConfig(level=logging.INFO)
 
     # インスタンス作成
-    mem = PersistentMemory('my_custom_database2.db')
-    # メモリに保存
-    await mem.save("test_key2", "test_value2")
-    # メモリから読み込み
-    value = await mem.load("test_key")
-    print(f"Loaded value: {value}")
-    value = await mem.load("test_key2")
-    print(f"Loaded value: {value}")
-    # クリーンアップ
-    await mem.close()
+    async with PersistentMemory('my_custom_database.db') as mem:
+        # メモリに保存
+        await mem.save("test_key", "test_value")
+        # メモリから読み込み
+        value = await mem.load("test_key")
+        print(f"Loaded value1: {value}")
+
+        counter = await mem.load("counter", 0)
+        print(f"Counter: {counter}")
+        counter += 1
+        await mem.save("counter", counter)
+
+        
+    # インスタンス作成
+    async with PersistentMemory('my_custom_database2.db') as mem:
+        # メモリに保存
+        await mem.save("test_key2", "test_value2")
+        # メモリから読み込み
+        value = await mem.load("test_key2")
+        print(f"Loaded value3: {value}")
+
+        value = await mem.load("test_key3", {})
+        print(f"Loaded value2: {value}")
+        value["count"] = value.get("count", 0) + 1
+        await mem.save("test_key3", value)
+        
 
 if __name__ == "__main__":
     asyncio.run(main())

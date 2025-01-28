@@ -6,7 +6,7 @@ with codecs.open('requirements.txt', 'r', encoding='utf-16') as f:
 
 setuptools.setup(
     name="pmem",
-    version="0.1.3",
+    version="0.1.4",
     install_requires=requirements,
     packages=setuptools.find_packages(),
     description="Persisten Memory",
