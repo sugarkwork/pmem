@@ -2,3 +2,5 @@
 /my_custom_database2.db
 /venv
 pmem/__pycache__/
+pmem/pickle_memory.py
+pmem/sqlite_memory2.py
