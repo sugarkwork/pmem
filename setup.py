@@ -1,15 +1,11 @@
-import codecs
 import setuptools
 
-with codecs.open('requirements.txt', 'r', encoding='utf-16') as f:
-    requirements = f.read().splitlines()
-
 setuptools.setup(
-    name="pmem",
+    name="skpmem",
     version="0.1.4",
-    install_requires=requirements,
+    install_requires=["aiosqlite", "setuptools"],
     packages=setuptools.find_packages(),
-    description="Persisten Memory",
+    description="Persistent Memory",
     author="sugarkwork",
     python_requires='>=3.10',
 )

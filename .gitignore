@@ -6,5 +6,4 @@ pmem/pickle_memory.py
 pmem/sqlite_memory2.py
 build/
 dist/
-pmem.egg-info/
-pppmem.egg-info/
+skpmem.egg-info/

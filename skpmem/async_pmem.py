@@ -8,7 +8,7 @@ import logging
 
 class PersistentMemory:
     def __init__(self, database_file: str = 'persistent_memory.db'):
-        self.logger = logging.getLogger('pmem')
+        self.logger = logging.getLogger('skpmem')
         self.database_file = database_file
         self.memory_store: dict = {}
         self.write_queue: asyncio.Queue = asyncio.Queue()
