@@ -100,6 +100,9 @@ class PersistentMemory:
             await self.write_queue.join()
             self._init_task.cancel()
     
+    async def flush(self):
+        await self.write_queue.join()
+    
     async def __aenter__(self):
         await self.initialize()
         return self
