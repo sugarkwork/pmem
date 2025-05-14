@@ -15,6 +15,35 @@ class PersistentMemory:
         self.initialized: bool = False
         self._init_task: Optional[asyncio.Task] = None
 
+    def __getitem__(self, key: str) -> Any:
+        """load を呼び出す"""
+        return asyncio.create_task(self.load(key))
+
+    def __setitem__(self, key: str, value: Any):
+        """キャッシュに値をセットし、非同期でDBにも保存"""
+        hash_key = self._name_hash(key)
+        self.memory_store[hash_key] = value
+        # 非同期でDB保存
+        asyncio.create_task(self.save(key, value))
+
+    def __delitem__(self, key: str):
+        """キャッシュとDBから削除（DB削除は非同期）"""
+        hash_key = self._name_hash(key)
+        if hash_key in self.memory_store:
+            del self.memory_store[hash_key]
+        asyncio.create_task(self._delete_from_db(hash_key))
+
+    async def _delete_from_db(self, hash_key: str):
+        if not self.initialized:
+            await self.initialize()
+        try:
+            async with aiosqlite.connect(self.database_file) as db:
+                await db.execute('DELETE FROM memory WHERE key = ?', (hash_key,))
+                await db.commit()
+                self.logger.debug(f"Deleted {hash_key} from DB")
+        except Exception as e:
+            self.logger.error(f"Error deleting from DB: {e}")
+
     async def initialize(self):
         if self.initialized:
             return
@@ -128,6 +157,9 @@ async def main():
         print(f"Counter: {counter}")
         counter += 1
         await mem.save("counter", counter)
+        
+        mem["test_key 3"] = "test_value 3"
+        print(await mem["test_key 3"])
 
         
     # インスタンス作成

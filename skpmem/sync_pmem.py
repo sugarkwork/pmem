@@ -30,6 +30,43 @@ class PersistentMemory:
 
     def _name_hash(self, name: str) -> str:
         return hashlib.sha512(name.encode()).hexdigest()
+    
+    def set(self, key: str, val: Any):
+        self.save(key, val)
+    
+    def get(self, key: str, defval: Any = None) -> Any:
+        return self.load(key, defval)
+    
+    def __getitem__(self, key: str) -> Any:
+        return self.load(key)
+
+    def __setitem__(self, key: str, value: Any):
+        self.save(key, value)
+
+    def __delitem__(self, key: str):
+        hash_key = self._name_hash(key)
+        if hash_key in self.memory_store:
+            del self.memory_store[hash_key]
+        self.delete(key)
+    
+    def delete(self, key: str):
+        if not self.initialized:
+            self.initialize()
+        
+        self.logger.debug(f"Deleting {key} from memory")
+
+        hash_key = self._name_hash(key)
+        if hash_key in self.memory_store:
+            del self.memory_store[hash_key]
+        
+        try:
+            with sqlite3.connect(self.database_file) as db:
+                self.logger.debug(f"Deleting {hash_key} from DB")
+                db.execute('DELETE FROM memory WHERE key = ?', (hash_key,))
+                db.commit()
+                self.logger.debug(f"Delete complete for {hash_key}")
+        except Exception as e:
+            self.logger.error(f"Error deleting from DB: {e}")
 
     def save(self, key: str, val: Any):
         if not self.initialized:
