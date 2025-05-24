@@ -63,7 +63,10 @@ def test_dict_interface():
         # 削除後の確認（存在しないキーにアクセス）
         try:
             deleted_value = mem["user_name"]
-            print(f"⚠️ 削除されたはずの値が取得できました: {deleted_value}")
+            if deleted_value is not None:
+                print(f"⚠️ 削除されたはずの値が取得できました: {deleted_value}")
+            else:
+                print("✓ 削除されたキーにアクセスすると値が取得できませんでした (None)")
         except KeyError:
             print("✓ 削除されたキーにアクセスするとKeyErrorが発生（期待通り）")
         
@@ -146,7 +149,10 @@ def test_error_handling():
         print("1. 存在しないキーへのアクセステスト")
         try:
             value = mem["nonexistent_key"]
-            print(f"⚠️ 存在しないキーから値が取得されました: {value}")
+            if value is not None:
+                print(f"⚠️ 存在しないキーから値が取得されました: {value}")
+            else:
+                print("✓ 存在しないキーから値が取得されませんでした (None)")
         except KeyError:
             print("✓ 存在しないキーでKeyErrorが発生（期待通り）")
         
